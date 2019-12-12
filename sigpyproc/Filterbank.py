@@ -529,7 +529,7 @@ class FilterbankBlock(np.ndarray):
     def __new__(cls,input_array,header):
         obj = input_array.astype("float32").view(cls)
         obj.header = header
-        obj.lib = C.CDLL("libSigPyProc32.so")
+        obj.lib = load_lib("libSigPyProc32.so")
         obj.dm = 0.0
         return obj
     
@@ -537,7 +537,7 @@ class FilterbankBlock(np.ndarray):
         if obj is None: return
         if hasattr(obj,"header"):
             self.header = obj.header
-        self.lib = C.CDLL("libSigPyProc32.so")
+        self.lib = load_lib("libSigPyProc32.so")
         self.dm = getattr(obj,"dm",0.0)
         
     def downsample(self,tfactor=1,ffactor=1):

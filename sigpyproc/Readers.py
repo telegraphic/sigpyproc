@@ -32,7 +32,7 @@ class FilReader(Filterbank):
             self.bitfact = 8/self.header.nbits
         else:
             self.bitfact = 1
-        self.sampsize = self.header.nchans*self.itemsize/self.bitfact
+        self.sampsize = int(self.header.nchans*self.itemsize/self.bitfact)
         super(FilReader,self).__init__()
 
     def readBlock(self,start,nsamps):
@@ -49,7 +49,7 @@ class FilReader(Filterbank):
         """
         self._file.seek(self.header.hdrlen+start*self.sampsize)
         data = self._file.cread(self.header.nchans*nsamps)
-        nsamps_read = data.size / self.header.nchans
+        nsamps_read = data.size // self.header.nchans
         data = data.reshape(nsamps_read, self.header.nchans).transpose()
         start_mjd = self.header.mjdAfterNsamps(start)
         new_header = self.header.newHeader({'tstart':start_mjd})
