@@ -7,7 +7,7 @@ from sigpyproc.HeaderParams import nbits_to_dtype
 from .ctype_helper import load_lib
 lib  = load_lib("libSigPyProc.so")
 
-class File(file):
+class File():
     """A class to handle writing of arbitrary bit size data to file.
 
     :param filename: name of file to open
@@ -175,7 +175,7 @@ def editInplace(inst,key,value):
     inst.header[key] = value
     new_header = inst.header.SPPHeader(back_compatible=True)
     if inst.header.hdrlen != len(new_header):
-        raise ValueError,"New header is too long/short for file"
+        raise ValueError("New header is too long/short for file")
     else:
         temp.seek(0)
         temp.write(new_header)
