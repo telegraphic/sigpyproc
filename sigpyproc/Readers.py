@@ -130,7 +130,7 @@ class FilReader(Filterbank):
                 stdout.write("Percentage complete: %d%%\r"%(100*ii/nreads))
                 stdout.flush()
             data = self._file.cread(block)
-            self._file.seek(skip*self.itemsize/self.bitfact,os.SEEK_CUR)
+            self._file.seek(skip*self.itemsize//self.bitfact,os.SEEK_CUR)
             yield int(block/self.header.nchans),int(ii),data
         if verbose:
             print("Execution time: %f seconds     \n"%(time.time()-tstart))
@@ -318,7 +318,7 @@ def parseSigprocHeader(filename):
     f.seek(0,2)
     header["filelen"]  = f.tell()
     header["nbytes"] =  header["filelen"]-header["hdrlen"]
-    header["nsamples"] = 8*header["nbytes"]/header["nbits"]/header["nchans"]
+    header["nsamples"] = int(8*header["nbytes"]/header["nbits"]/header["nchans"])
     f.seek(0)
     header["filename"] = filename
     header["basename"] = os.path.splitext(filename)[0]
@@ -330,7 +330,7 @@ def _read_char(f):
 
 def _read_string(f):
     strlen = unpack("I",f.read(4))[0]
-    return f.read(strlen)
+    return f.read(strlen).decode("UTF-8")
 
 def _read_int(f):
     return unpack("I",f.read(4))[0]

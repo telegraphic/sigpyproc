@@ -111,9 +111,9 @@ class Header(dict):
         """
         
         self.updateHeader()
-        hstart  = "HEADER_START"
-        hend    = "HEADER_END"
-        header  = "".join([pack("I",len(hstart)),hstart])
+        hstart  = b"HEADER_START"
+        hend    = b"HEADER_END"
+        header  = b"".join([pack("I",len(hstart)),hstart])
         
         for key in list(self.keys()):
             if back_compatible and key not in conf.sigproc_keys:
@@ -122,14 +122,14 @@ class Header(dict):
                 continue
 
             if conf.header_keys[key] == "str":
-                header = "".join([header,_write_string(key,self[key])])
+                header = b"".join([header,_write_string(key,self[key])])
             elif conf.header_keys[key] == "I":
-                header = "".join([header,_write_int(key,self[key])])
+                header = b"".join([header,_write_int(key,self[key])])
             elif conf.header_keys[key] == "d":
-                header = "".join([header,_write_double(key,self[key])])
+                header = b"".join([header,_write_double(key,self[key])])
             elif conf.header_keys[key] == "b":
-                header = "".join([header,_write_char(key,self[key])])
-        return "".join([header,pack("I",len(hend)),hend])
+                header = b"".join([header,_write_char(key,self[key])])
+        return b"".join([header,pack("I",len(hend)),hend])
 
     def makeInf(self,outfile=None):
         """Make a presto format .inf file.
@@ -223,20 +223,25 @@ class Header(dict):
         return out_file
 
 def _write_string(key,value):
-    return "".join([pack("I", len(key)),
+    key   = key.encode("UTF-8")
+    value = value.encode("UTF-8")
+    return b"".join([pack("I", len(key)),
                     key,pack('I',len(value)),
                     value])
 
 def _write_int(key,value):
-    return "".join([pack('I',len(key)),
+    key   = key.encode("UTF-8")
+    return b"".join([pack('I',len(key)),
                     key,pack('I',value)])
 
 def _write_double(key,value):
-    return "".join([pack('I',len(key)),
+    key   = key.encode("UTF-8")
+    return b"".join([pack('I',len(key)),
                     key,pack('d',value)])
 
 def _write_char(key,value):
-    return "".join([pack('I',len(key)),
+    key   = key.encode("UTF-8")
+    return b"".join([pack('I',len(key)),
                     key,pack('b',value)])
 
 def radec_to_str(val):
