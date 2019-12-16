@@ -1,4 +1,5 @@
 import os
+import glob
 import ctypes as C
 
 THIS_DIRPATH   = os.path.dirname(os.path.abspath(__file__))
@@ -12,5 +13,7 @@ def load_lib(libname):
 
     Returns a ctypes.CDLL object
     """
-    lib = C.CDLL(os.path.join(PARENT_DIRPATH, libname))
+    libname = ("*"+".so").join(libname.split(".so"))
+    libfile = glob.glob(os.path.join(PARENT_DIRPATH, libname))[0]
+    lib = C.CDLL(libfile)
     return lib

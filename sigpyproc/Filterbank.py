@@ -292,9 +292,9 @@ class Filterbank(object):
         if filename is None:
             filename = "%s_f%d_t%d.fil"%(self.header.basename,ffactor,tfactor)
         if not self.header.nchans%ffactor == 0:
-            raise ValueError,"Bad frequency factor given"
+            raise ValueError("Bad frequency factor given")
         if not gulp%tfactor == 0:
-            raise ValueError,"Gulp must be a multiple of tfactor"
+            raise ValueError("Gulp must be a multiple of tfactor")
         out_file = self.header.prepOutfile(filename,
                                    {"tsamp":self.header.tsamp*tfactor,
                                     "nchans":self.header.nchans/ffactor,
@@ -346,11 +346,11 @@ class Filterbank(object):
 
         """
         if np.modf(period/self.header.tsamp)[0]<0.001:
-            print "WARNING: Foldng interval is an integer multiple of the sampling time"
+            print("WARNING: Foldng interval is an integer multiple of the sampling time")
         if nbins > period/self.header.tsamp:
-            print "WARNING: Number of phase bins is greater than period/sampling time"
+            print("WARNING: Number of phase bins is greater than period/sampling time")
         if (self.header.nsamples*self.header.nchans)/(nbands*nints*nbins) < 10:
-            raise ValueError,"nbands x nints x nbins is too large."
+            raise ValueError("nbands x nints x nbins is too large.")
         nbands        = min(nbands,self.header.nchans)
         chan_delays   = self.header.getDMdelays(dm)
         chan_delays_c = as_c(chan_delays)
@@ -394,7 +394,7 @@ class Filterbank(object):
         :rtype: :class:`~sigpyproc.TimeSeries.TimeSeries`
         """
         if chan >= self.header.nchans or chan < 0:
-            raise ValueError,"Selected channel out of range."
+            raise ValueError("Selected channel out of range.")
         tim_ar   = np.empty(self.header.nsamples,dtype="float32")
         tim_ar_c = as_c(tim_ar)
         for nsamps,ii,data in self.readPlan(gulp):
@@ -459,7 +459,7 @@ class Filterbank(object):
                                              {"nchans":1,"nbits":32,"data_type":2},
                                              back_compatible=back_compatible,nbits=32)
             
-                     for ii in xrange(self.header.nchans)]
+                     for ii in range(self.header.nchans)]
         for nsamps,ii,data in self.readPlan(gulp):
             self.lib.splitToChans(as_c(data),
                                   tim_ar_c,
@@ -529,7 +529,7 @@ class FilterbankBlock(np.ndarray):
     def __new__(cls,input_array,header):
         obj = input_array.astype("float32").view(cls)
         obj.header = header
-        obj.lib = C.CDLL("libSigPyProc32.so")
+        obj.lib = load_lib("libSigPyProc32.so")
         obj.dm = 0.0
         return obj
     
@@ -537,7 +537,7 @@ class FilterbankBlock(np.ndarray):
         if obj is None: return
         if hasattr(obj,"header"):
             self.header = obj.header
-        self.lib = C.CDLL("libSigPyProc32.so")
+        self.lib = load_lib("libSigPyProc32.so")
         self.dm = getattr(obj,"dm",0.0)
         
     def downsample(self,tfactor=1,ffactor=1):
@@ -558,7 +558,7 @@ class FilterbankBlock(np.ndarray):
 
         """ 
         if not self.shape[0]%ffactor == 0:
-            raise ValueError,"Bad frequency factor given"
+            raise ValueError("Bad frequency factor given")
         newnsamps = self.shape[1] - self.shape[1]%tfactor
         new_ar = np.empty(newnsamps*self.shape[0]/ffactor/tfactor,dtype="float32")
         ar = self.transpose().ravel().copy()
