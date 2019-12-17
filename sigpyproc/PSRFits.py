@@ -68,12 +68,10 @@ class SpectraInfo:
 
             # Open the PSRFITS file
             with pyfits.open(fn, mode='readonly', memmap=True) as hdus:
-
                 if ii == 0:
                     self.hdu_names = [hdu.name for hdu in hdus]
-
                 primary = hdus['PRIMARY'].header
-
+                
                 if 'TELESCOP' not in primary.keys():
                     telescope = ""
                 else:

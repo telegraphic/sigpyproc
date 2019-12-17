@@ -161,7 +161,6 @@ class FitsReader(Filterbank):
         self.filename = psrfitsfn
         self.filelist = psrfitslist
         self.fileid   = 0
-
         self._fits    = pyfits.open(psrfitsfn, mode='readonly', memmap=True)
 
         # Header 
@@ -261,10 +260,6 @@ class FitsReader(Filterbank):
         if skipback >= gulp:
             raise ValueError("readsamps must be > skipback value")
 
-
-        self._file.seek(self.header.hdrlen+start*self.sampsize)
-
-
         nreads   = nsamps//(gulp-skipback)
         lastread = nsamps-(nreads*(gulp-skipback))
         if lastread<skipback:
@@ -313,7 +308,6 @@ class FitsReader(Filterbank):
 
             start    = start + block + skipback
             data     = data.transpose().ravel()
-
             yield int(block),int(ii),data
 
         if verbose:
