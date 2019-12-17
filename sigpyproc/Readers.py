@@ -153,7 +153,7 @@ class FitsReader(Filterbank):
     """
     def __init__(self, psrfitslist):
         if isinstance(psrfitslist, str):
-            psrfitslist = list(psrfitslist)
+            psrfitslist = [psrfitslist]
 
         psrfitsfn = psrfitslist[0]
         if not os.path.isfile(psrfitsfn):
