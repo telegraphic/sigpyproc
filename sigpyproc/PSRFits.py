@@ -71,7 +71,7 @@ class SpectraInfo:
                 if ii == 0:
                     self.hdu_names = [hdu.name for hdu in hdus]
                 primary = hdus['PRIMARY'].header
-                
+
                 if 'TELESCOP' not in primary.keys():
                     telescope = ""
                 else:
@@ -124,10 +124,10 @@ class SpectraInfo:
 
                 # Channel/sub-band offset for split files
                 try:
-                	if subint['NCHNOFFS'] > 0:
-                    	logger.warning("first freq channel is not 0 in file %d" % ii)
+                    if subint['NCHNOFFS'] > 0:
+                        logger.warning("first freq channel is not 0 in file %d" % ii)
                 except TypeError as err:
-                	logger.warning("NCHNOFFS is not properly defined in header.")
+                    logger.warning("NCHNOFFS is not properly defined in header.")
 
                 self.spectra_per_subint = subint['NSBLK']
                 self.bits_per_sample    = subint['NBITS']

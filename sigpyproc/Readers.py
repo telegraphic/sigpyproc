@@ -247,9 +247,6 @@ class FitsReader(Filterbank):
            where data always has contains ``nchans*nsamps`` points. 
 
         """
-        # Make gulp multiple of spectra_per_subint (clean way)
-
-
         if nsamps is None:
             nsamps = self.header.nsamples-start
         if nsamps<gulp:
