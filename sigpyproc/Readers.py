@@ -12,7 +12,12 @@ from sigpyproc.Filterbank import Filterbank,FilterbankBlock
 from sigpyproc.TimeSeries import TimeSeries
 from sigpyproc.FourierSeries import FourierSeries
 
+import astropy.io.fits as pyfits
 from sigpyproc.PSRFits import SpectraInfo, unpack_2bit, unpack_4bit
+
+import warnings
+warnings.showwarning = lambda message, category = UserWarning, filename = '', \
+                              lineno = -1, file=None, line=None : print(message)
 
 class FilReader(Filterbank):
     """Class to handle the reading of sigproc format filterbank files
@@ -185,13 +190,13 @@ class FitsReader(Filterbank):
         # Calculate starting subint and ending subint
         startsub = int(start / self.specinfo.spectra_per_subint)
         skip     = int(start - (startsub * self.specinfo.spectra_per_subint))
-        endsub   = int((start + nsamps) / self.specinfo.spectra_per_subint)
+        endsub   = int((start + nsamps - 1) / self.specinfo.spectra_per_subint)
         trunc    = int(((endsub + 1) * self.specinfo.spectra_per_subint) - (start + nsamps))
 
         # sort of cread (#TODO if possible)
         # Read full subints (need to be more fast #TODO)
-        data     = self.get_data(self, startsub, endsub, apply_weights=apply_weights, 
-                                    apply_scales=apply_scales, apply_offsets=apply_offsets)
+        data     = self.get_data(startsub, endsub, apply_weights=apply_weights, 
+                                       apply_scales=apply_scales, apply_offsets=apply_offsets)
         # data shape is (nchan, nsample)
         # Truncate data to desired interval
         if trunc > 0:
@@ -207,7 +212,8 @@ class FitsReader(Filterbank):
 
 
 
-    def readPlan(self,gulp,skipback=0,start=0,nsamps=None,verbose=True):
+    def readPlan(self,gulp,skipback=0,start=0,nsamps=None,verbose=True,apply_weights=False, 
+                            apply_scales=False, apply_offsets=False):
         """
         A generator used to perform PSRFits reading.
  
@@ -283,15 +289,17 @@ class FitsReader(Filterbank):
                 stdout.write("Percentage complete: %d%%\r"%(100*ii/nreads))
                 stdout.flush()
 
+            if block == 0:
+                continue
             # Calculate starting subint and ending subint
             startsub = int(start / self.specinfo.spectra_per_subint)
             skip     = int(start - (startsub * self.specinfo.spectra_per_subint))
-            endsub   = int((start + block) / self.specinfo.spectra_per_subint)
+            endsub   = int((start + block - 1) / self.specinfo.spectra_per_subint)
             trunc    = int(((endsub + 1) * self.specinfo.spectra_per_subint) - (start + block))
 
             # sort of cread (#TODO if possible)
             # Read full subints (need to be more fast #TODO)
-            data     = self.get_data(self, startsub, endsub, apply_weights=apply_weights, 
+            data     = self.get_data(startsub, endsub, apply_weights=apply_weights, 
                                     apply_scales=apply_scales, apply_offsets=apply_offsets)
 
             # data shape is (nchan, nsample)
@@ -407,20 +415,20 @@ class FitsReader(Filterbank):
             # Handle 4-poln GUPPI/PUPPI data
             if (len(shp) == 3 and shp[1] == self.specinfo.num_polns and
                     self.specinfo.poln_order == "AABBCRCI"):
-                logger.warning("Polarization is AABBCRCI, summing AA and BB")
+                warnings.warn("Polarization is AABBCRCI, summing AA and BB")
                 data = np.zeros((self.specinfo.spectra_per_subint,
                                  self.header.nchans), dtype=np.float32)
                 data += sdata[:, 0, :].squeeze()
                 data += sdata[:, 1, :].squeeze()
             elif (len(shp) == 3 and shp[1] == self.specinfo.num_polns and
                   self.specinfo.poln_order == "IQUV"):
-                logger.warning("Polarization is IQUV, just using Stokes I")
+                warnings.warn("Polarization is IQUV, just using Stokes I")
                 data = np.zeros((self.specinfo.spectra_per_subint,
                                  self.header.nchans), dtype=np.float32)
                 data += sdata[:, 0, :].squeeze()
             else:
                 data = np.asarray(sdata)
-        data = data.reshape((self.spectra_per_subint,
+        data = data.reshape((self.specinfo.spectra_per_subint,
                              self.header.nchans)).astype(np.float32)
         if apply_scales: data *= self.get_scales(isub)[:self.header.nchans]
         if apply_offsets: data += self.get_offsets(isub)[:self.header.nchans]

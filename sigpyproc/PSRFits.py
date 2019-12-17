@@ -18,7 +18,6 @@ Pravir Kumar
 import re
 import os
 import os.path
-import logging
 
 import numpy as np
 import astropy.time as aptime
@@ -29,7 +28,9 @@ import sigpyproc.HeaderParams as conf
 from sigpyproc.Header import Header as SigpyprocHeader
 
 
-logger = logging.getLogger(__name__)
+import warnings
+warnings.showwarning = lambda message, category = UserWarning, filename = '', \
+                              lineno = -1, file=None, line=None : print(message)
 
 
 SECPERDAY = float('86400.0')
@@ -39,7 +40,6 @@ date_obs_re = re.compile(r"^(?P<year>[0-9]{4})-(?P<month>[0-9]{2})-" \
                          "(?P<day>[0-9]{2})T(?P<hour>[0-9]{2}):" \
                          "(?P<min>[0-9]{2}):(?P<sec>[0-9]{2}" \
                          "(?:\.[0-9]+)?)$")
-
 
 
 class SpectraInfo:
@@ -80,7 +80,7 @@ class SpectraInfo:
                     self.telescope = telescope
                 else:
                     if telescope != self.telescope[0]:
-                        logger.warning(
+                        warnings.warn(
                             f"'TELESCOP' values don't match for files 0 ({self.telescope[0]}) and {ii}({telescope})!")
 
                 self.observer   = primary['OBSERVER']
@@ -112,7 +112,7 @@ class SpectraInfo:
                     self.tracking = track
                 else:
                     if track != self.tracking:
-                        logger.warning("'TRK_MODE' values don't match for files 0 and %d" % ii)
+                        warnings.warn("'TRK_MODE' values don't match for files 0 and %d" % ii)
 
                 # Now switch to the subint HDU header
                 subint = hdus['SUBINT'].header
@@ -125,9 +125,9 @@ class SpectraInfo:
                 # Channel/sub-band offset for split files
                 try:
                     if subint['NCHNOFFS'] > 0:
-                        logger.warning("first freq channel is not 0 in file %d" % ii)
+                        warnings.warn("first freq channel is not 0 in file %d" % ii)
                 except TypeError as err:
-                    logger.warning("NCHNOFFS is not properly defined in header.")
+                    warnings.warn("NCHNOFFS is not properly defined in header.")
 
                 self.spectra_per_subint = subint['NSBLK']
                 self.bits_per_sample    = subint['NBITS']
@@ -160,24 +160,24 @@ class SpectraInfo:
                 # Get the time offset column info and the offset for the 1st row
                 # Identify the OFFS_SUB column number
                 if 'OFFS_SUB' not in subint_hdu.columns.names:
-                    logger.warning("Can't find the 'OFFS_SUB' column!")
+                    warnings.warn("Can't find the 'OFFS_SUB' column!")
                 else:
                     colnum = subint_hdu.columns.names.index('OFFS_SUB')
                     if ii == 0:
                         self.offs_sub_col = colnum
                     elif self.offs_sub_col != colnum:
-                        logger.warning("'OFFS_SUB' column changes between files 0 and %d!" % ii)
+                        warnings.warn("'OFFS_SUB' column changes between files 0 and %d!" % ii)
 
                 # Identify the data column and the data type
                 if 'DATA' not in subint_hdu.columns.names:
-                    logger.warning("Can't find the 'DATA' column!")
+                    warnings.warn("Can't find the 'DATA' column!")
                 else:
                     colnum = subint_hdu.columns.names.index('DATA')
                     if ii == 0:
                         self.data_col = colnum
                         self.FITS_typecode = subint_hdu.columns[self.data_col].format[-1]
                     elif self.data_col != colnum:
-                        logger.warning("'DATA' column changes between files 0 and %d!" % ii)
+                        warnings.warn("'DATA' column changes between files 0 and %d!" % ii)
 
                 # Telescope azimuth
                 if 'TEL_AZ' not in subint_hdu.columns.names:
@@ -199,7 +199,7 @@ class SpectraInfo:
 
                 # Observing frequencies
                 if 'DAT_FREQ' not in subint_hdu.columns.names:
-                    logger.warning("Can't find the channel freq column, 'DAT_FREQ'!")
+                    warnings.warn("Can't find the channel freq column, 'DAT_FREQ'!")
                 else:
                     colnum = subint_hdu.columns.names.index('DAT_FREQ')
                     freqs = first_subint['DAT_FREQ'][:self.num_channels]
@@ -212,51 +212,51 @@ class SpectraInfo:
                         # Now check that the channel spacing is the same throughout
                         ftmp = freqs[1:] - freqs[:-1]
                         if np.any((ftmp - self.df)) > 1e-7:
-                            logger.warning("Channel spacing changes in file %d!" % ii)
+                            warnings.warn("Channel spacing changes in file %d!" % ii)
                     else:
                         ftmp = np.abs(self.df - (freqs[1] - freqs[0]))
                         if ftmp > 1e-7:
-                            logger.warning("Channel spacing between files 0 and %d!" % ii)
+                            warnings.warn("Channel spacing between files 0 and %d!" % ii)
                         ftmp = np.abs(self.lo_freq - freqs.min())
                         if ftmp > 1e-7:
-                            logger.warning("Low channel changes between files 0 and %d!" % ii)
+                            warnings.warn("Low channel changes between files 0 and %d!" % ii)
                         ftmp = np.abs(self.hi_freq - freqs.max())
                         if ftmp > 1e-7:
-                            logger.warning("High channel changes between files 0 and %d!" % ii)
+                            warnings.warn("High channel changes between files 0 and %d!" % ii)
 
                 # Data weights
                 if 'DAT_WTS' not in subint_hdu.columns.names:
-                    logger.warning("Can't find the channel weights column, 'DAT_WTS'!")
+                    warnings.warn("Can't find the channel weights column, 'DAT_WTS'!")
                 else:
                     colnum = subint_hdu.columns.names.index('DAT_WTS')
                     if ii == 0:
                         self.dat_wts_col = colnum
                     elif self.dat_wts_col != colnum:
-                        logger.warning("'DAT_WTS column changes between files 0 and %d!" % ii)
+                        warnings.warn("'DAT_WTS column changes between files 0 and %d!" % ii)
                     if np.any(first_subint['DAT_WTS'][:self.num_channels] != 1.0):
                         self.need_weight = True
 
                 # Data offsets
                 if 'DAT_OFFS' not in subint_hdu.columns.names:
-                    logger.warning("Can't find the channel offsets column, 'DAT_OFFS'!")
+                    warnings.warn("Can't find the channel offsets column, 'DAT_OFFS'!")
                 else:
                     colnum = subint_hdu.columns.names.index('DAT_OFFS')
                     if ii == 0:
                         self.dat_offs_col = colnum
                     elif self.dat_offs_col != colnum:
-                        logger.warning("'DAT_OFFS column changes between files 0 and %d!" % ii)
+                        warnings.warn("'DAT_OFFS column changes between files 0 and %d!" % ii)
                     if np.any(first_subint['DAT_OFFS'] != 0.0):
                         self.need_offset = True
 
                 # Data scalings
                 if 'DAT_SCL' not in subint_hdu.columns.names:
-                    logger.warning("Can't find the channel scalings column, 'DAT_SCL'!")
+                    warnings.warn("Can't find the channel scalings column, 'DAT_SCL'!")
                 else:
                     colnum = subint_hdu.columns.names.index('DAT_SCL')
                     if ii == 0:
                         self.dat_scl_col = colnum
                     elif self.dat_scl_col != colnum:
-                        logger.warning("'DAT_SCL' column changes between files 0 and %d!" % ii)
+                        warnings.warn("'DAT_SCL' column changes between files 0 and %d!" % ii)
                     if np.any(first_subint['DAT_SCL'] != 1.0):
                         self.need_scale = True
 
