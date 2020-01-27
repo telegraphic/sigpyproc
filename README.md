@@ -14,13 +14,7 @@ Installation
 
 ### Step-by-step guide
 
-Once you have all the requirements installed, you can install this via pip:
-
-```
-pip install git+https://github.com/telegraphic/sigpyproc
-```
-
-Or, download / clone this repository, and then run
+Once you have all the requirements installed, download / clone this repository, and then run
 
 ```
 python setup.py install
@@ -41,8 +35,4 @@ docker run --rm -it sigpyproc
 ```
 
 (Have a read of docker tutorials and documentation for more details!)
-
-
-[![Build Status](https://travis-ci.org/telegraphic/sigpyproc.svg?branch=master)](https://travis-ci.org/telegraphic/sigpyproc)
-
 
