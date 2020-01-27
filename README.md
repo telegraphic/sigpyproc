@@ -1,6 +1,20 @@
 sigpyproc
 =========
 
+`sigpyproc` is a pulsar and FRB data analysis library for python.
+
+Usage
+-----
+
+```python
+from sigpyproc.Readers import FilReader
+myFil = FilReader("tutorial.fil")
+
+from sigpyproc.Readers import FitsReader
+myFits = FitsReader("tutorial.fits")
+
+```
+
 Installation
 ------------
 
