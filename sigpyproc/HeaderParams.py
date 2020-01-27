@@ -99,6 +99,7 @@ struct_to_numpy = {
 telescope_ids = {
     "Fake": 0,
     "Arecibo": 1,
+    "ARECIBO 305m": 1, 
     "Ooty": 2,
     "Nancay": 3,
     "Parkes": 4, 
@@ -106,8 +107,15 @@ telescope_ids = {
     "GBT": 6,
     "GMRT": 7,
     "Effelsberg": 8,
-    "Effelsberg LOFAR":9,
-    "Unknown": 10}
+    "ATA": 9,
+    "SRT": 10,
+    "LOFAR": 11, 
+    "VLA": 12, 
+    "CHIME": 20,
+    "FAST": 21, 
+    "MeerKAT": 64, 
+    "KAT-7": 65,
+    "Unknown": 100}
 
 ids_to_telescope = dict(zip(telescope_ids.values(), telescope_ids.keys()))
 
@@ -115,13 +123,23 @@ machine_ids = {
     "FAKE": 0,
     "PSPM": 1,
     "Wapp": 2,
+    "WAPP": 2,
     "AOFTM": 3,
     "BCPM1": 4,
+    "BPP": 4,
     "OOTY": 5,
     "SCAMP": 6,
     "GBT Pulsar Spigot": 7,
+    "SPIGOT": 7,
     "PFFTS": 8,
-    "Unknown":9}
+    "BG/P": 11,
+    "PDEV": 12, 
+    "Medusa": 15,
+    "GUPPI": 16,
+    "CHIME+PSR": 20, 
+    "KAT": 64, 
+    "KAT-DC2": 65,
+    "Unknown":99}
 
 ids_to_machine = dict(zip(machine_ids.values(), machine_ids.keys()))
 
