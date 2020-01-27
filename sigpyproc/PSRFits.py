@@ -141,18 +141,6 @@ class SpectraInfo:
                 else:
                     self.zero_offset = subint['ZERO_OFF']
 
-                # This is the MJD offset based on the starting subint number
-                MJDf = (self.time_per_subint * self.start_subint[ii]) / SECPERDAY
-                # The start_MJD values should always be correct
-                self.start_MJD[ii] += MJDf
-
-                # Compute the starting spectra from the times
-                MJDf = self.start_MJD[ii] - self.start_MJD[0]
-                if MJDf < 0.0:
-                    raise ValueError("File %d seems to be from before file 0!" % ii)
-
-                self.start_spec[ii] = (MJDf * SECPERDAY / self.dt + 0.5)
-
                 # Now pull stuff from the columns
                 subint_hdu   = hdus['SUBINT']
                 first_subint = subint_hdu.data[0]
@@ -168,6 +156,55 @@ class SpectraInfo:
                     elif self.offs_sub_col != colnum:
                         warnings.warn("'OFFS_SUB' column changes between files 0 and %d!" % ii)
 
+                # Read the OFFS_SUB column value for the 1st row
+                offs_sub = first_subint[self.offs_sub_col]
+                if offs_sub != 0.0:
+                    numrows = int((offs_sub - 0.5 * self.time_per_subint) / \
+                                   self.time_per_subint + 1e-7)
+                    # Check to see if any rows have been deleted or are missing
+                    if numrows > self.start_subint[ii]:
+                        warnings.warn("NSUBOFFS reports %d previous rows\n" \
+                                      "but OFFS_SUB implies %d. Using OFFS_SUB.\n" \
+                                      "Will likely be able to correct for this.\n" % \
+                                      (start_subint[ii], numrows))
+                    self.start_subint[ii] = numrows
+                else:
+                    offs_sub_are_zero = True
+                    # If OFFS_SUB are all 0.0, then we will assume that there are
+                    # no gaps in the file.  This isn't truly proper PSRFITS, but
+                    # we should still be able to handle it.
+                    for isubint in range(num_subint):
+                        offs_sub = subint_hdu.data[isubint][self.offs_sub_col]
+                        if offs_sub != 0.0:
+                            offs_sub_are_zero = False
+                            raise ValueError("Error!: Some, but not all OFFS_SUB are 0.0. \
+                                              Not good PSRFITS.\n")
+                    if offs_sub_are_zero:
+                        warnings.warn("All OFFS_SUB are 0.0. Assuming no missing rows.\n")
+                    # Check to see if there is an INDEXVAL column.  That should tell
+                    # us if we are missing any subints.  Use it in lieu of OFFS_SUB
+                    if 'INDEXVAL' not in subint_hdu.columns.names:
+                        warnings.warn("No INDEXVAL column, either. This is not proper PSRFITS.\n")
+                        self.start_subint[ii] = 0
+                    else:
+                        indexval_col = subint_hdu.columns.names.index('INDEXVAL')
+                        # Read INDEXVAL
+                        subint_index = first_subint[indexval_col]
+                        self.start_subint[ii] = int(subint_index + 1e-7 - 1.0)
+
+                # This is the MJD offset based on the starting subint number
+                MJDf = (self.time_per_subint * self.start_subint[ii]) / SECPERDAY
+                # The start_MJD values should always be correct
+                self.start_MJD[ii] += MJDf
+
+                # Compute the starting spectra from the times
+                MJDf = self.start_MJD[ii] - self.start_MJD[0]
+                if MJDf < 0.0:
+                    raise ValueError("File %d seems to be from before file 0!" % ii)
+
+                self.start_spec[ii] = int(MJDf * SECPERDAY / self.dt + 0.5)
+
+                # Now pull stuff from the other columns
                 # Identify the data column and the data type
                 if 'DATA' not in subint_hdu.columns.names:
                     warnings.warn("Can't find the 'DATA' column!")
@@ -295,6 +332,7 @@ class SpectraInfo:
         self.bytes_per_subint = self.bytes_per_spectra * self.spectra_per_subint
 
         # Flip the band?
+        # TODO! confusing!
         if self.df < 0:
             #self.df *= -1.0
             self.need_flipband = True
@@ -388,8 +426,8 @@ class SpectraInfo:
         header = {}
 
         # dictionary with filterbank header keys and values.
-        header["telescope_id"]  = conf.telescope_ids.get(self.telescope, 0)
-        header["machine_id"]    = conf.machine_ids.get(self.backend,0)
+        header["telescope_id"]  = conf.telescope_ids.get(self.telescope, 100)
+        header["machine_id"]    = conf.machine_ids.get(self.backend,99)
         header["data_type"]     = 1                    # filterbank
         header["source_name"]   = self.source
         header["barycentric"]   = 0                    # always not barycentered?
@@ -401,14 +439,13 @@ class SpectraInfo:
         header["tstart"]        = self.start_MJD[0]
         header["tsamp"]         = self.dt
         header["nifs"]          = 1                    # Always 1 polarization (self.num_polns)
-        # Always read psrfits data in 32 bits
-        header["nbits"]         = 32                   # self.bits_per_sample
+        header["nbits"]         = self.bits_per_sample
         header["nsamples"]      = int(self.N)
         # first channel (fch1) in sigproc is the highest freq
         # foff is negative to signify this
-        header["fch1"]          = self.fctr + np.abs(self.num_channels*self.df)/2.0 \
-                                            - np.abs(self.df)/2.0
-        header["foff"]          = -1.0*np.abs(self.df)
+        header["fch1"]          = self.fctr + abs(self.num_channels*float(self.df))/2.0 \
+                                            - abs(float(self.df))/2.0
+        header["foff"]          = -1.0*abs(float(self.df))
         header["nchans"]        = self.num_channels
         header["rawdatafile"]   = os.path.basename(self.filenames[0])
 
@@ -428,7 +465,7 @@ def DATEOBS_to_MJD(dateobs):
                                              (float(m.group("sec")) / 60.0)) / 60.0) / 24.0
     mjd_day = aptime.Time("%d-%d-%d" % (float(m.group("year")), \
                                         float(m.group("month")), float(m.group("day"))), format="iso").mjd
-    return mjd_day, mjd_fracday
+    return int(mjd_day), mjd_fracday
 
 
 def is_PSRFITS(filename):
