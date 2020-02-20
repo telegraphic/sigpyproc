@@ -17,23 +17,20 @@ Pravir Kumar
 
 import re
 import os
-import os.path
 
 import numpy as np
-import astropy.time as aptime
-import astropy.io.fits as pyfits
-from astropy import coordinates, units
+from astropy import units
+from astropy.io import fits
+from astropy.time import Time
+from astropy.coordinates import Angle
+from astropy.time.formats import erfa
 
 import sigpyproc.HeaderParams as conf 
 from sigpyproc.Header import Header as SigpyprocHeader
 
-
 import warnings
 warnings.showwarning = lambda message, category = UserWarning, filename = '', \
                               lineno = -1, file=None, line=None : print(message)
-
-
-SECPERDAY = float('86400.0')
 
 # Regular expression for parsing DATE-OBS card's format.
 date_obs_re = re.compile(r"^(?P<year>[0-9]{4})-(?P<month>[0-9]{2})-" \
@@ -43,19 +40,23 @@ date_obs_re = re.compile(r"^(?P<year>[0-9]{4})-(?P<month>[0-9]{2})-" \
 
 
 class SpectraInfo:
+    """
+    Read and convert PSRFITS information from a group of files
+    and place the resulting info into a spectra_info structure.
+    """
     def __init__(self, filenames):
         self.filenames = filenames
         self.num_files = len(filenames)
         self.N = 0
 
         # Initialise a few arrays
-        self.start_MJD    = np.empty(self.num_files)
-        self.num_subint   = np.empty(self.num_files, dtype=np.int64)
         self.start_subint = np.empty(self.num_files)
+        self.num_subint   = np.empty(self.num_files, dtype=np.int64)
         self.start_spec   = np.empty(self.num_files, dtype=np.int64)
-        self.num_pad      = np.empty(self.num_files, dtype=np.int64)
         self.num_spec     = np.empty(self.num_files, dtype=np.int64)
-
+        self.num_pad      = np.empty(self.num_files, dtype=np.int64)
+        self.start_MJD    = np.empty(self.num_files, dtype=np.float64)
+        
         # The following should default to False
         self.need_scale    = False
         self.need_offset   = False
@@ -63,13 +64,15 @@ class SpectraInfo:
         self.need_flipband = False
 
         for ii, fn in enumerate(filenames):
+            # Is the file a PSRFITS file?
             if not is_PSRFITS(fn):
-                raise ValueError("File '%s' does not appear to be PSRFITS!" % fn)
+                raise ValueError(f"\nError! File '{fn}' does not appear to be PSRFITS!\n")
 
             # Open the PSRFITS file
             with pyfits.open(fn, mode='readonly', memmap=True) as hdus:
                 if ii == 0:
                     self.hdu_names = [hdu.name for hdu in hdus]
+
                 primary = hdus['PRIMARY'].header
 
                 if 'TELESCOP' not in primary.keys():
@@ -79,7 +82,7 @@ class SpectraInfo:
                 if ii == 0:
                     self.telescope = telescope
                 else:
-                    if telescope != self.telescope[0]:
+                    if telescope != self.telescope:
                         warnings.warn(
                             f"'TELESCOP' values don't match for files 0 ({self.telescope[0]}) and {ii}({telescope})!")
 
@@ -104,7 +107,7 @@ class SpectraInfo:
                     self.chan_dm = primary['CHAN_DM']
 
                 self.start_MJD[ii] = primary['STT_IMJD'] + (primary['STT_SMJD'] + \
-                                                            primary['STT_OFFS']) / SECPERDAY
+                                                            primary['STT_OFFS']) / erfa.DAYSEC
 
                 # Are we tracking
                 track = (primary['TRK_MODE'] == "TRACK")
@@ -112,7 +115,7 @@ class SpectraInfo:
                     self.tracking = track
                 else:
                     if track != self.tracking:
-                        warnings.warn("'TRK_MODE' values don't match for files 0 and %d" % ii)
+                        warnings.warn(f"'TRK_MODE' values don't match for files 0 and {ii}")
 
                 # Now switch to the subint HDU header
                 subint = hdus['SUBINT'].header
@@ -125,14 +128,18 @@ class SpectraInfo:
                 # Channel/sub-band offset for split files
                 try:
                     if subint['NCHNOFFS'] > 0:
-                        warnings.warn("first freq channel is not 0 in file %d" % ii)
+                        warnings.warn(f"First freq channel is not 0 in file {ii}")
                 except TypeError as err:
                     warnings.warn("NCHNOFFS is not properly defined in header.")
 
                 self.spectra_per_subint = subint['NSBLK']
                 self.bits_per_sample    = subint['NBITS']
                 self.num_subint[ii]     = subint['NAXIS2']
-                self.start_subint[ii]   = subint['NSUBOFFS']   # Subint offset
+
+                try:
+                    self.start_subint[ii]   = subint['NSUBOFFS']   # Subint offset
+                except TypeError:
+                    self.start_subint[ii]   = 0
                 self.time_per_subint    = self.dt * self.spectra_per_subint
 
                 # ZERO_OFF card is not in earlier versions of PSRFITS
@@ -154,7 +161,7 @@ class SpectraInfo:
                     if ii == 0:
                         self.offs_sub_col = colnum
                     elif self.offs_sub_col != colnum:
-                        warnings.warn("'OFFS_SUB' column changes between files 0 and %d!" % ii)
+                        warnings.warn(f"'OFFS_SUB' column changes between files 0 and {ii}!")
 
                 # Read the OFFS_SUB column value for the 1st row
                 offs_sub = first_subint[self.offs_sub_col]
@@ -163,10 +170,9 @@ class SpectraInfo:
                                    self.time_per_subint + 1e-7)
                     # Check to see if any rows have been deleted or are missing
                     if numrows > self.start_subint[ii]:
-                        warnings.warn("NSUBOFFS reports %d previous rows\n" \
-                                      "but OFFS_SUB implies %d. Using OFFS_SUB.\n" \
-                                      "Will likely be able to correct for this.\n" % \
-                                      (start_subint[ii], numrows))
+                        warnings.warn(f"NSUBOFFS reports {start_subint[ii]} previous rows\n"
+                                      f"but OFFS_SUB implies {numrows}. Using OFFS_SUB.\n"
+                                      f"Will likely be able to correct for this.\n"
                     self.start_subint[ii] = numrows
                 else:
                     offs_sub_are_zero = True
@@ -193,16 +199,16 @@ class SpectraInfo:
                         self.start_subint[ii] = int(subint_index + 1e-7 - 1.0)
 
                 # This is the MJD offset based on the starting subint number
-                MJDf = (self.time_per_subint * self.start_subint[ii]) / SECPERDAY
+                MJDf = (self.time_per_subint * self.start_subint[ii]) / erfa.DAYSEC
                 # The start_MJD values should always be correct
                 self.start_MJD[ii] += MJDf
 
                 # Compute the starting spectra from the times
                 MJDf = self.start_MJD[ii] - self.start_MJD[0]
                 if MJDf < 0.0:
-                    raise ValueError("File %d seems to be from before file 0!" % ii)
+                    raise ValueError(f"File {ii}seems to be from before file 0!")
 
-                self.start_spec[ii] = int(MJDf * SECPERDAY / self.dt + 0.5)
+                self.start_spec[ii] = int(MJDf * erfa.DAYSEC / self.dt + 0.5)
 
                 # Now pull stuff from the other columns
                 # Identify the data column and the data type
@@ -214,7 +220,7 @@ class SpectraInfo:
                         self.data_col = colnum
                         self.FITS_typecode = subint_hdu.columns[self.data_col].format[-1]
                     elif self.data_col != colnum:
-                        warnings.warn("'DATA' column changes between files 0 and %d!" % ii)
+                        warnings.warn(f"'DATA' column changes between files 0 and {ii}!")
 
                 # Telescope azimuth
                 if 'TEL_AZ' not in subint_hdu.columns.names:
@@ -249,17 +255,17 @@ class SpectraInfo:
                         # Now check that the channel spacing is the same throughout
                         ftmp = freqs[1:] - freqs[:-1]
                         if np.any((ftmp - self.df)) > 1e-7:
-                            warnings.warn("Channel spacing changes in file %d!" % ii)
+                            warnings.warn(f"Channel spacing changes in file {ii}!")
                     else:
                         ftmp = np.abs(self.df - (freqs[1] - freqs[0]))
                         if ftmp > 1e-7:
-                            warnings.warn("Channel spacing between files 0 and %d!" % ii)
+                            warnings.warn(f"Channel spacing between files 0 and {ii}!")
                         ftmp = np.abs(self.lo_freq - freqs.min())
                         if ftmp > 1e-7:
-                            warnings.warn("Low channel changes between files 0 and %d!" % ii)
+                            warnings.warn(f"Low channel changes between files 0 and {ii}!")
                         ftmp = np.abs(self.hi_freq - freqs.max())
                         if ftmp > 1e-7:
-                            warnings.warn("High channel changes between files 0 and %d!" % ii)
+                            warnings.warn(f"High channel changes between files 0 and {ii}!")
 
                 # Data weights
                 if 'DAT_WTS' not in subint_hdu.columns.names:
@@ -269,7 +275,7 @@ class SpectraInfo:
                     if ii == 0:
                         self.dat_wts_col = colnum
                     elif self.dat_wts_col != colnum:
-                        warnings.warn("'DAT_WTS column changes between files 0 and %d!" % ii)
+                        warnings.warn(f"'DAT_WTS column changes between files 0 and {ii}!")
                     if np.any(first_subint['DAT_WTS'][:self.num_channels] != 1.0):
                         self.need_weight = True
 
@@ -281,7 +287,7 @@ class SpectraInfo:
                     if ii == 0:
                         self.dat_offs_col = colnum
                     elif self.dat_offs_col != colnum:
-                        warnings.warn("'DAT_OFFS column changes between files 0 and %d!" % ii)
+                        warnings.warn(f"'DAT_OFFS column changes between files 0 and {ii}!" % ii)
                     if np.any(first_subint['DAT_OFFS'] != 0.0):
                         self.need_offset = True
 
@@ -293,7 +299,7 @@ class SpectraInfo:
                     if ii == 0:
                         self.dat_scl_col = colnum
                     elif self.dat_scl_col != colnum:
-                        warnings.warn("'DAT_SCL' column changes between files 0 and %d!" % ii)
+                        warnings.warn(f"'DAT_SCL' column changes between files 0 and {ii}!" % ii)
                     if np.any(first_subint['DAT_SCL'] != 1.0):
                         self.need_scale = True
 
@@ -309,8 +315,8 @@ class SpectraInfo:
 
         # Finished looping through PSRFITS files. Finalise a few things.
         # Convert the position strings into degrees        
-        self.ra2000 = coordinates.Angle(self.ra_str, unit=units.hourangle).deg
-        self.dec2000 = coordinates.Angle(self.dec_str, unit=units.deg).deg
+        self.ra2000 = Angle(self.ra_str, unit=units.hourangle).deg
+        self.dec2000 = Angle(self.dec_str, unit=units.deg).deg
 
         # Are the polarisations summed?
         if (self.poln_order == "AA+BB") or (self.poln_order == "INTEN"):
@@ -340,7 +346,7 @@ class SpectraInfo:
         # Compute the bandwidth
         self.BW   = self.num_channels * self.df
         self.mjd  = int(self.start_MJD[0])
-        self.secs = (self.start_MJD[0] % 1) * SECPERDAY
+        self.secs = (self.start_MJD[0] % 1) * erfa.DAYSEC
 
     def __str__(self):
         """
@@ -461,10 +467,10 @@ def DATEOBS_to_MJD(dateobs):
     """
     # Parse string using regular expression defined at top of file
     m = date_obs_re.match(dateobs)
-    mjd_fracday = (float(m.group("hour")) + (float(m.group("min")) + \
-                                             (float(m.group("sec")) / 60.0)) / 60.0) / 24.0
-    mjd_day = aptime.Time("%d-%d-%d" % (float(m.group("year")), \
-                                        float(m.group("month")), float(m.group("day"))), format="iso").mjd
+    mjd_fracday = (float(m.group("hour")) + (float(m.group("min")) \
+                                          + (float(m.group("sec")) / 60.0)) / 60.0) / 24.0
+    mjd_day = Time("%d-%d-%d" % (float(m.group("year")), float(m.group("month")), 
+                                 float(m.group("day"))), format="iso").mjd
     return int(mjd_day), mjd_fracday
 
 
@@ -473,9 +479,8 @@ def is_PSRFITS(filename):
     Return True if filename appears to be PSRFITS format.
         Return False otherwise.
     """
-    with pyfits.open(filename, mode='readonly', memmap=True) as hdus:
+    with fits.open(filename, mode='readonly', memmap=True) as hdus:
         primary = hdus['PRIMARY'].header
-
         try:
             isPSRFITS = ((primary['FITSTYPE'] == "PSRFITS") and \
                          (primary['OBS_MODE'] == "SEARCH"))
