@@ -172,7 +172,7 @@ class SpectraInfo:
                     if numrows > self.start_subint[ii]:
                         warnings.warn(f"NSUBOFFS reports {start_subint[ii]} previous rows\n"
                                       f"but OFFS_SUB implies {numrows}. Using OFFS_SUB.\n"
-                                      f"Will likely be able to correct for this.\n"
+                                      f"Will likely be able to correct for this.\n")
                     self.start_subint[ii] = numrows
                 else:
                     offs_sub_are_zero = True

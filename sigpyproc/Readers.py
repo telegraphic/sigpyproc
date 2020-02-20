@@ -36,7 +36,7 @@ class FilReader(Filterbank):
         self._file = File(filename,"r",self.header.nbits)
         self.itemsize = np.dtype(self.header.dtype).itemsize
         if self.header.nbits in [1,2,4]:
-            self.bitfact = 8/self.header.nbits
+            self.bitfact = 8//self.header.nbits
         else:
             self.bitfact = 1
         self.sampsize = int(self.header.nchans*self.itemsize/self.bitfact)
@@ -131,9 +131,9 @@ class FilReader(Filterbank):
             print("Called by:            ",istack()[1][3])
             print("Number of samps:      ",nsamps)
             print("Number of reads:      ",nreads)
-            print("Nsamps per read:      ",blocks[0][1]/self.header.nchans)
-            print("Nsamps of final read: ",blocks[-1][1]/self.header.nchans)
-            print("Nsamps to skip back:  ",-1*blocks[0][2]/self.header.nchans)
+            print("Nsamps per read:      ",blocks[0][1]//self.header.nchans)
+            print("Nsamps of final read: ",blocks[-1][1]//self.header.nchans)
+            print("Nsamps to skip back:  ",-1*blocks[0][2]//self.header.nchans)
             print()
         
         for ii,block,skip in blocks:
