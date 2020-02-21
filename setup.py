@@ -55,12 +55,30 @@ ext5 = Extension('libSigPyProc',
                  extra_compile_args=["-fopenmp", "-Wno-unused-variable", "-Wno-strict-prototypes"],
                  )
 
+
+# http://astropy.readthedocs.org/en/latest/development/scripts.html
+entry_points = {
+    'console_scripts' : [
+        'fil_writer = sigpyproc.fil_writer:main'
+     ]
+}
+
+
+install_requires = [
+        'astropy',
+        'numpy',
+        'natsort',
+        'tqdm',
+]
+
 setup(name='sigpyproc',
       version=__version__,
       description='Python pulsar data toolbox',
-      install_requires = ['numpy'],
+      install_requires = install_requires,
+      python_requires = '>=3.6',
       author='Ewan Barr',
       author_email='ewan.d.barr@googlemail.com',
+      entry_points=entry_points,
       long_description=describe('README.md'),
       ext_modules=[ext0, ext1, ext2, ext3, ext4, ext5],
       packages=['sigpyproc'],

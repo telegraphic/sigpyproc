@@ -69,7 +69,7 @@ class SpectraInfo:
                 raise ValueError(f"\nError! File '{fn}' does not appear to be PSRFITS!\n")
 
             # Open the PSRFITS file
-            with pyfits.open(fn, mode='readonly', memmap=True) as hdus:
+            with fits.open(fn, mode='readonly', memmap=True) as hdus:
                 if ii == 0:
                     self.hdu_names = [hdu.name for hdu in hdus]
 

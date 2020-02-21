@@ -1,18 +1,15 @@
-import os
+import os, sys
 import time
-import sigpyproc.HeaderParams as conf
 import numpy as np
-from inspect import stack as istack
-import struct
-from struct import unpack
-from sys import stdout
+import inspect, struct
+from astropy.io import fits
+
+import sigpyproc.HeaderParams as conf
 from sigpyproc.Utils import File
 from sigpyproc.Header import Header
 from sigpyproc.Filterbank import Filterbank,FilterbankBlock
 from sigpyproc.TimeSeries import TimeSeries
 from sigpyproc.FourierSeries import FourierSeries
-
-import astropy.io.fits as pyfits
 from sigpyproc.PSRFits import SpectraInfo, unpack_2bit, unpack_4bit
 
 import warnings
@@ -128,7 +125,7 @@ class FilReader(Filterbank):
             print("Filterbank reading plan:")
             print("------------------------")
             print("Called on file:       ",self.filename)      
-            print("Called by:            ",istack()[1][3])
+            print("Called by:            ",inspect.stack()[1][3])
             print("Number of samps:      ",nsamps)
             print("Number of reads:      ",nreads)
             print("Nsamps per read:      ",blocks[0][1]//self.header.nchans)
@@ -138,8 +135,8 @@ class FilReader(Filterbank):
         
         for ii,block,skip in blocks:
             if verbose:
-                stdout.write("Percentage complete: %d%%\r"%(100*ii/nreads))
-                stdout.flush()
+                sys.stdout.write("Percentage complete: %d%%\r"%(100*ii/nreads))
+                sys.stdout.flush()
             data = self._file.cread(block)
             self._file.seek(skip*self.itemsize//self.bitfact,os.SEEK_CUR)
             yield int(block/self.header.nchans),int(ii),data
@@ -151,6 +148,8 @@ class FilReader(Filterbank):
 class FitsReader(Filterbank):
     """
     Class to handle the reading of PSRFits format fits files
+    Note: No scaling done. If pols are summed, return in floats 
+    otherwise in input dtype
     
     :param filename: list of PSRFits files
     :type filename: :func:`str`
@@ -158,7 +157,7 @@ class FitsReader(Filterbank):
     .. note::
     
        To be considered as a PSRFits format fits file the header must be
-       readable using Astropy pyfits package. 
+       readable using astropy.io.fits package. 
     """
     def __init__(self, psrfitslist):
         if isinstance(psrfitslist, str):
@@ -170,7 +169,7 @@ class FitsReader(Filterbank):
         self.filename = psrfitsfn
         self.filelist = psrfitslist
         self.fileid   = 0
-        self._fits    = pyfits.open(psrfitsfn, mode='readonly', memmap=True)
+        self._fits    = fits.open(psrfitsfn, mode='readonly', memmap=True)
 
         # Header 
         self.specinfo = SpectraInfo(psrfitslist)
@@ -203,16 +202,18 @@ class FitsReader(Filterbank):
         # sort of cread (#TODO if possible)
         # Read full subints (need to be more fast #TODO)
         data     = self.get_data(startsub, endsub, apply_weights=apply_weights, 
-                                       apply_scales=apply_scales, apply_offsets=apply_offsets)
-        # data shape is (nchan, nsample)
+                                 apply_scales=apply_scales, apply_offsets=apply_offsets)
+        # data shape is (nsample, nchan)
         # Truncate data to desired interval
         if trunc > 0:
-            data = data[:, skip:-trunc]
+            data = data[skip:-trunc]
         elif trunc == 0:
-            data = data[:, skip:]
+            data = data[skip:]
         else:
             raise ValueError("Number of bins to truncate is negative: %d" % trunc)
 
+        # Transpose the data (return as nchan, nsamp)
+        data = data.transpose()
         start_mjd  = self.header.mjdAfterNsamps(start)
         new_header = self.header.newHeader({'tstart':start_mjd})
         if as_filterbankBlock:
@@ -286,7 +287,7 @@ class FitsReader(Filterbank):
             print("PSRFits reading plan:")
             print("------------------------")
             print("Called on file:       ",self.filename)      
-            print("Called by:            ",istack()[1][3])
+            print("Called by:            ",inspect.stack()[1][3])
             print("Number of samps:      ",nsamps)
             print("Number of reads:      ",nreads)
             print("Nsamps per read:      ",blocks[0][1])
@@ -296,8 +297,8 @@ class FitsReader(Filterbank):
         
         for ii,block,skipback in blocks:
             if verbose:
-                stdout.write("Percentage complete: %d%%\r"%(100*ii/nreads))
-                stdout.flush()
+                sys.stdout.write("Percentage complete: %d%%\r"%(100*ii/nreads))
+                sys.stdout.flush()
 
             # Calculate starting subint and ending subint
             startsub = int(start / self.specinfo.spectra_per_subint)
@@ -305,23 +306,21 @@ class FitsReader(Filterbank):
             endsub   = int((start + block - 1) / self.specinfo.spectra_per_subint)
             trunc    = int(((endsub + 1) * self.specinfo.spectra_per_subint) - (start + block))
 
-            # sort of cread (#TODO if possible)
             # Read full subints (need to be more fast #TODO)
             data     = self.get_data(startsub, endsub, apply_weights=apply_weights, 
-                                    apply_scales=apply_scales, apply_offsets=apply_offsets)
+                                     apply_scales=apply_scales, apply_offsets=apply_offsets)
 
             # data shape is (nchan, nsample)
             # Truncate data to desired interval
             if trunc > 0:
-                data = data[:, skip:-trunc]
+                data = data[skip:-trunc]
             elif trunc == 0:
-                data = data[:, skip:]
+                data = data[skip:]
             else:
                 raise ValueError("Number of bins to truncate is negative: %d" % trunc)
 
             start    = start + block + skipback
-            data     = Wrap(data.transpose().ravel())
-            yield int(block),int(ii),data.unlink()
+            yield int(block), int(ii), data.ravel()
 
         if verbose:
             print("Execution time: %f seconds     \n"%(time.time()-tstart))
@@ -330,9 +329,8 @@ class FitsReader(Filterbank):
 
 
     def get_data(self, startsub, endsub, apply_weights=False, 
-                        apply_scales=False, apply_offsets=False):
+                 apply_scales=False, apply_offsets=False):
         """
-        #FUTURE Work: Move this whole function in C
         Source: https://github.com/devanshkv/your/blob/master/your/psrfits.py 
         Return 2D array of data from PSRFITS file.
 
@@ -347,29 +345,29 @@ class FitsReader(Filterbank):
 
         if startfileid != self.fileid:
             self.fileid = startfileid
-            self._fits.close()
             del self._fits['SUBINT']
+            self._fits.close()
             self.filename = self.filelist[self.fileid]
-            self._fits = pyfits.open(self.filename, mode='readonly', memmap=True)
+            self._fits = fits.open(self.filename, mode='readonly', memmap=True)
 
         # Read data
         data = []
         for isub in range(startsub, endsub + 1):
             if isub > cumsum_num_subint[self.fileid] - 1:
-                self._fits.close()
                 del self._fits['SUBINT']
+                self._fits.close()
                 self.fileid += 1
                 if self.fileid == len(self.filelist):
                     self.fileid-=1
                     break
                 self.filename = self.filelist[self.fileid]
-                self._fits = pyfits.open(self.filename, mode='readonly', memmap=True)
+                self._fits = fits.open(self.filename, mode='readonly', memmap=True)
 
             fsub = int((isub - np.concatenate([np.array([0]),cumsum_num_subint]))[self.fileid])
             try:
                 data.append(self.read_subint(fsub, apply_weights, apply_scales, apply_offsets))
             except KeyError:
-                self._fits = pyfits.open(self.filename, mode='readonly', memmap=True)
+                self._fits = fits.open(self.filename, mode='readonly', memmap=True)
                 data.append(self.read_subint(fsub, apply_weights, apply_scales, apply_offsets))
 
         # data shape: (nsample, nchan)
@@ -383,14 +381,14 @@ class FitsReader(Filterbank):
         if self.specinfo.df > 0:
             data = np.fliplr(data)
 
-        # return data shape: (nchan, nsample)                  
-        return data.T
+        # return data shape: (nsample, nchan)                  
+        return data
 
 
     def read_subint(self, isub, apply_weights=True, apply_scales=True, \
                     apply_offsets=True):
         """
-        Read a PSRFITS subint from a open pyfits file object.
+        Read a PSRFITS subint from a open fits file object.
          Applys scales, weights, and offsets to the data.
              Inputs: 
                 isub: index of subint (first subint is 0)
@@ -427,11 +425,6 @@ class FitsReader(Filterbank):
                 data += sdata[:, 0, :].squeeze()
                 data += sdata[:, 1, :].squeeze()
 
-                scale_fac = 0.5 if self.header.nbits != 32 else 1
-
-                # Scale data
-                data *= scale_fac
-
             # Handle 4-poln Parkes UWL data (with interesting headers)
             # bypass poln_order checkpoint (POL_TYPE= '*       ')
             elif (len(shp) == 3 and shp[1] == self.specinfo.num_polns and
@@ -443,12 +436,7 @@ class FitsReader(Filterbank):
                 data = np.zeros((self.specinfo.spectra_per_subint,
                                  self.header.nchans), dtype=np.float32)
                 data += sdata[:, 0, :].squeeze()
-                data += sdata[:, 1, :].squeeze()    
-
-                scale_fac = 0.5 if self.header.nbits != 32 else 1
-
-                # Scale data
-                data *= scale_fac
+                data += sdata[:, 1, :].squeeze()
 
             elif (len(shp) == 3 and shp[1] == self.specinfo.num_polns and
                   self.specinfo.poln_order == "IQUV"):
@@ -468,11 +456,12 @@ class FitsReader(Filterbank):
             if apply_offsets: data += self.get_offsets(isub)[:self.header.nchans]
             if apply_weights: data *= self.get_weights(isub)[:self.header.nchans]
 
-        else:
+        #else:
             # dtype is of sdata not data!!!
-            data = data.astype(sdata.dtype, copy=False)
+            # data = data.astype(sdata.dtype, copy=False)
 
         # Applying these scales, offsets, weights always return floats
+        # Also, if summing polarizations, return floats
         # If no, then return dtype.
 
         # Magic happens here 
@@ -514,44 +503,6 @@ class FitsReader(Filterbank):
         """
         return self._fits['SUBINT'].data[isub]['DAT_OFFS']
 
-
-    def convert_tofilterbank(self, outfn, nsub=1, nbits=8, apply_weights=False, 
-                                   apply_scales=False, apply_offsets=False):
-        """
-        Convert PSRFits file or set of files for a pointing to Filterbank format.
-            Inputs:
-                nsub: number of subbands to split into
-        """
-        out_files = []
-        hdr_changes = {}
-        chanpersub = self.header.nchans // nsub
-        for isub in range(nsub):
-            hdr_changes["nchans"] = chanpersub
-            hdr_changes["fch1"] = self.header.fch1 + isub*chanpersub*self.header.foff
-            if nsub > 1:
-                outfil = outfn.split(".fil")[0] + "_sub" + str(isub).zfill(2) + ".fil"
-            else:
-                outfil = outfn.split(".fil")[0] + ".fil"
-            out_files.append(self.header.prepOutfile(outfil, hdr_changes, nbits=nbits))
-
-        # Now read data and dump
-        print
-        print("PSRFits to Filterbank conversion:")
-        print("---------------------------------")
-        print("Writing file:       ", outfn) 
-        for nsamps, ii, data in self.readPlan(gulp=self.specinfo.spectra_per_subint, 
-                                              verbose=True, 
-                                              apply_weights=apply_weights, 
-                                              apply_scales=apply_scales, 
-                                              apply_offsets=apply_offsets):
-            for isub, out_file in enumerate(out_files):
-                data = data.reshape(nsamps, self.header.nchans)
-                subint_tofil  = data[:,chanpersub*isub:chanpersub*(isub+1)]
-                out_file.cwrite(subint_tofil.ravel())
-
-        # Now close each of the filterbank file.
-        for out_file in out_files:
-            out_file.close()
 
 
 def readDat(filename,inf=None):
@@ -700,14 +651,14 @@ def parseSigprocHeader(filename):
     f = open(filename,"rb")
     header = {}
     try:
-        keylen = unpack("I",f.read(4))[0]
+        keylen = struct.unpack("I",f.read(4))[0]
     except struct.error:
         raise IOError("File Header is not in sigproc format... Is file empty?")
     key = f.read(keylen)
     if key != b"HEADER_START":
         raise IOError("File Header is not in sigproc format")
     while True:
-        keylen = unpack("I",f.read(4))[0]
+        keylen = struct.unpack("I",f.read(4))[0]
         key = f.read(keylen)
         
         # convert bytestring to unicode (Python 3)
@@ -743,17 +694,17 @@ def parseSigprocHeader(filename):
     return Header(header) 
         
 def _read_char(f):
-    return unpack("b",f.read(1))[0]
+    return struct.unpack("b",f.read(1))[0]
 
 def _read_string(f):
-    strlen = unpack("I",f.read(4))[0]
+    strlen = struct.unpack("I",f.read(4))[0]
     return f.read(strlen).decode("UTF-8")
 
 def _read_int(f):
-    return unpack("I",f.read(4))[0]
+    return struct.unpack("I",f.read(4))[0]
 
 def _read_double(f):
-    return unpack("d",f.read(8))[0]
+    return struct.unpack("d",f.read(8))[0]
 
 
 
