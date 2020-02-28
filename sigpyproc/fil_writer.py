@@ -47,35 +47,40 @@ def files_sanity_check(fits_fns):
 
 
 
-def scale_data(myReader, nbits, mode="digifil"):
+def scale_data(myReader, nbits, mode="digifil", verbose=True):
     """
     Get scale factor when converting summed AA+BB data back to 8 bits.
     """
     if mode == "presto":
-        print("\nCalculating statistics on first subintegration...")
+        if verbose:
+            print("\nCalculating statistics on first subintegration...")
         subint0 = myReader.read_subint(0, apply_weights=False, apply_scales=False, 
                                           apply_offsets=False)
         new_max = 3 * np.median(subint0)
-        print("\t3*median =", new_max)
+        if verbose:
+            print("\t3*median =", new_max)
         if new_max > 2.0**nbits:
             scale_fac = new_max / ( 2.0**nbits )
-            print(f'\tScaling data by {1/scale_fac:.3f}')
-            print(f'\tValues larger than {new_max:.3f}(pre-scaling) will be set to {2**nbits - 1}\n')
+            if verbose:
+                print(f'\tScaling data by {1/scale_fac:.3f}')
+                print(f'\tValues larger than {new_max:.3f}(pre-scaling) will be set to {2**nbits - 1}\n')
         else:
             scale_fac = 1
-            print(f'\tNo scaling necessary')
-            print(f'\tValues larger than {2**nbits-1}(2^nbits) will be set to {2**nbits-1}\n')
+            if verbose:
+                print(f'\tNo scaling necessary')
+                print(f'\tValues larger than {2**nbits-1}(2^nbits) will be set to {2**nbits-1}\n')
 
     if mode == "digifil":
-        print("\nUsing digifil scalings...")
         scale_fac = np.sqrt(2.0)
-        print(f'\tScaling data by {1/scale_fac:.3f}')
-        print(f'\tValues larger than {(2**nbits-1)*scale_fac:.3f}(pre-scaling) will be set to {2**nbits - 1}\n')
-
+        if verbose:
+            print("\nUsing digifil scalings...")
+            print(f'\tScaling data by {1/scale_fac:.3f}')
+            print(f'\tValues larger than {(2**nbits-1)*scale_fac:.3f}(pre-scaling) will be set to {2**nbits - 1}\n')
     return scale_fac
 
 def fits_converter(fits_fns, outfn, nbits, nsub, apply_weights=False, 
-                   apply_scales=False, apply_offsets=False, mode="digifil"):
+                   apply_scales=False, apply_offsets=False, mode="digifil", 
+                   nsamples=0, tqdm_desc=None, verbose=True):
     """
     Convert psrfits data to SIGPROC filterbank files. 
     """
@@ -98,17 +103,25 @@ def fits_converter(fits_fns, outfn, nbits, nsub, apply_weights=False,
             outfil = f'{outfn.split(".fil")[0]}.fil'
         out_files.append(myFits.header.prepOutfile(outfil, hdr_changes, nbits=nbits))
 
-    scale_fac = scale_data(myFits, nbits=nbits, mode=mode)
-
-    print("PSRFits to Filterbank conversion:")
-    print("---------------------------------")
+    scale_fac = scale_data(myFits, nbits=nbits, mode=mode, verbose=verbose)
+    # Number of subints to read
+    if nsamples == 0:
+        nsamples = myFits.header.nsamples
+    elif nsamples < myFits.specinfo.spectra_per_subint:
+        raise TypeError(f'Cannot read less than spectra_per_subint: '
+                        f'{myFits.specinfo.spectra_per_subint}')
+    if verbose:
+        print("PSRFits to Filterbank conversion:")
+        print("---------------------------------")
     for nsamps, ii, data in tqdm(
-                            myFits.readPlan(gulp=myFits.specinfo.spectra_per_subint, 
+                            myFits.readPlan(gulp=myFits.specinfo.spectra_per_subint,
+                                            nsamps=nsamples,
                                             verbose=False, 
                                             apply_weights=apply_weights, 
                                             apply_scales=apply_scales, 
                                             apply_offsets=apply_offsets),
-                            total=int(myFits.specinfo.num_subint.sum())):
+                            total=int(np.ceil(nsamples/myFits.specinfo.spectra_per_subint)),
+                            desc=tqdm_desc):
         # scaling, clipping and bit conversion
         if nbits == 8: 
             data /= scale_fac
@@ -125,14 +138,17 @@ def fits_converter(fits_fns, outfn, nbits, nsub, apply_weights=False,
         out_file.close()
 
     end_time = timeit.default_timer()
-    print(f'Done')
-    print(f'Execution time: {(end_time-start_time):.3f} seconds\n')
+    if verbose:
+        print(f'Done')
+        print(f'Execution time: {(end_time-start_time):.3f} seconds\n')
 
-def fil_splitter(fil_fns, outfn, nsub):
+def fil_splitter(fil_fns, outfn, nsub, tqdm_desc=None, verbose=True):
     """
     Split filterbank data to different subband files
     """
     start_time = timeit.default_timer()
+    if isinstance(fil_fns, str):
+        fil_fns = [fil_fns]    
     if len(fil_fns) > 1:
         raise TypeError(f'Input files: "{len(fil_fns)}". Not supported yet!.')
     if nsub == 1:
@@ -148,12 +164,14 @@ def fil_splitter(fil_fns, outfn, nsub):
         outfil = f'{outfn.split(".fil")[0]}_sub{str(isub).zfill(2)}.fil'
         out_files.append(myFil.header.prepOutfile(outfil, hdr_changes, nbits=myFil.header.nbits))
 
-    print("Splitting Filterbank:")
-    print("---------------------------------")
+    if verbose:
+        print("Splitting Filterbank:")
+        print("---------------------------------")
     gulpsize = 32768
     for nsamps, ii, data in tqdm(
                             myFil.readPlan(gulp=gulpsize, verbose=False),
-                            total=myFil.header.nsamples//gulpsize):
+                            total=np.ceil(myFil.header.nsamples/gulpsize).astype('int'),
+                            desc=tqdm_desc):
         for isub, out_file in enumerate(out_files):
             data = data.reshape(nsamps, myFil.header.nchans)
             subint_tofil = data[:,chanpersub*isub:chanpersub*(isub+1)]
@@ -164,8 +182,9 @@ def fil_splitter(fil_fns, outfn, nsub):
         out_file.close()
 
     end_time = timeit.default_timer()
-    print(f'Done')
-    print(f'Execution time: {(end_time-start_time):.3f} seconds\n')
+    if verbose:
+        print(f'Done')
+        print(f'Execution time: {(end_time-start_time):.3f} seconds\n')
 
 
 #https://astropy.readthedocs.io/en/latest/development/scripts.html
@@ -187,6 +206,9 @@ def main():
                         action = "store", default = 1, 
                         help = "Number of subbands to split file into (default: 1)")
 
+    parser.add_argument("-nsamples", dest = "nsamples", metavar = "", type = int, 
+                        default = 0, 
+                        help = "Number of samples to read from fits files (default: all)")
     parser.add_argument("-scale_mode", dest = "scale_mode", metavar = "", type = str, 
                         default = "digifil", 
                         help = "Scaling type for fits conversion [digifil (default), presto]")
@@ -210,7 +232,7 @@ def main():
 
     if infile_format == "psrfits":
         fits_converter(args.infiles, args.outfn, args.nbits, args.nsub, args.apply_weights, 
-                       args.apply_scales, args.apply_offsets, args.scale_mode)
+                       args.apply_scales, args.apply_offsets, args.scale_mode, args.nsamples)
 
     elif infile_format == "filterbank":
         fil_splitter(args.infiles, args.outfn, args.nsub)
