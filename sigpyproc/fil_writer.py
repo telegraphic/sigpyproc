@@ -71,11 +71,17 @@ def scale_data(myReader, nbits, mode="digifil", verbose=True):
                 print(f'\tValues larger than {2**nbits-1}(2^nbits) will be set to {2**nbits-1}\n')
 
     if mode == "digifil":
-        scale_fac = np.sqrt(2.0)
-        if verbose:
-            print("\nUsing digifil scalings...")
-            print(f'\tScaling data by {1/scale_fac:.3f}')
-            print(f'\tValues larger than {(2**nbits-1)*scale_fac:.3f}(pre-scaling) will be set to {2**nbits - 1}\n')
+        if myReader.specinfo.poln_order == "IQUV":
+            scale_fac = 1
+            if verbose:
+                print(f'\tNo scaling necessary')
+                print(f'\tValues larger than {2**nbits-1}(2^nbits) will be set to {2**nbits-1}\n')
+        else:   
+            scale_fac = np.sqrt(2.0)
+            if verbose:
+                print("\nUsing digifil scalings...")
+                print(f'\tScaling data by {1/scale_fac:.3f}')
+                print(f'\tValues larger than {(2**nbits-1)*scale_fac:.3f}(pre-scaling) will be set to {2**nbits - 1}\n')
     return scale_fac
 
 def fits_converter(fits_fns, outfn, nbits, nsub, apply_weights=False, 
