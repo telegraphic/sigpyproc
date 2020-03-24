@@ -448,7 +448,7 @@ class FitsReader(Filterbank):
                 data = np.asarray(sdata)
 
         data = data.reshape((self.specinfo.spectra_per_subint,
-                             self.header.nchans))
+                             self.header.nchans)).astype(np.float32, copy=False)
 
         if apply_scales or apply_offsets or apply_weights:
             data -= self.specinfo.zero_offset
