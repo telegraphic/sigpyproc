@@ -442,7 +442,7 @@ class FitsReader(Filterbank):
                   self.specinfo.poln_order == "IQUV"):
                 warnings.warn("Polarization is IQUV, just using Stokes I")
                 data = np.zeros((self.specinfo.spectra_per_subint,
-                                 self.header.nchans), dtype=sdata.dtype)
+                                 self.header.nchans), dtype=np.float32)
                 data += sdata[:, 0, :].squeeze()
             else:
                 data = np.asarray(sdata)
