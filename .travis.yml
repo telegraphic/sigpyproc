@@ -1,6 +1,6 @@
 language: python
 python:
-  - "2.7"
+  - "3.6"      # current default Python on Travis CI
 
 # command to install dependencies
 install:
@@ -9,7 +9,7 @@ install:
   - sudo apt-get install -qq git curl wget make cmake fftw3 fftw3-dev pkg-config libiomp-dev libopenmpi-dev
   - pip install --upgrade pip
   - pip install --upgrade setuptools
-  - pip install numpy matplotlib ipython
+  - pip install numpy matplotlib ipython astropy
   - pip install .
 
 # Run tests

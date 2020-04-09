@@ -1,12 +1,14 @@
+import io
 import ctypes as C
 import numpy as np
+import warnings
 from numpy.ctypeslib import as_ctypes as as_c
 from sigpyproc.HeaderParams import nbits_to_dtype
 
 from .ctype_helper import load_lib
 lib  = load_lib("libSigPyProc.so")
 
-class File(file):
+class File(io.FileIO):
     """A class to handle writing of arbitrary bit size data to file.
 
     :param filename: name of file to open
@@ -23,10 +25,13 @@ class File(file):
        The File class handles all packing and unpacking of sub-byte size data 
        under the hood, so all calls can be made requesting numbers of units 
        rather than numbers of bits or bytes.
+
+       modified:
+       cannot subclass file in python 3; using FileIO instead.
     """
 
     def __init__(self,filename,mode,nbits=8):
-        file.__init__(self,filename,mode)
+        super(File, self).__init__(filename,mode)
         self.nbits = nbits
         self.dtype = nbits_to_dtype[self.nbits]
         if nbits in [1,2,4]:
@@ -34,7 +39,7 @@ class File(file):
             self.unpack = True
         else:
             self.bitfact = 1
-            self.unpack = False
+            self.unpack = False          
 
     def cread(self,nunits):
         """Read nunits of data from the file.
@@ -47,7 +52,7 @@ class File(file):
         """
 
         count = int(nunits*self.bitfact)
-        data = np.fromfile(self,count=count,dtype=self.dtype)
+        data = np.fromfile(self, count=count, dtype=self.dtype)
         if self.unpack:
             unpacked = np.empty(nunits,dtype=self.dtype)
             lib.unpack(as_c(data),
@@ -69,8 +74,20 @@ class File(file):
            Regardless of the dtype of the array argument, the data will be packed
            with a bitsize determined by the nbits attribute of the File instance.
            To change this attribute, use the _setNbits methods.
+           It is the responsibility of the user to ensure that values in the array
+           do not go beyond the maximum and minimum values allowed by the nbits
+           attribute.
         """
-        
+        if self.dtype != ar.dtype:
+            warnings.warn("Given data (dtype={0}) will be unsafely cast to the \
+                          requested dtype={1} before being written out to file"\
+                          .format(ar.dtype, self.dtype), stacklevel=2)
+            ar = ar.astype(self.dtype, casting='unsafe')
+         
+        #The lib.pack function has an assumption that the given array has 8-bit
+        #data. If the given array was, say 32-bit floats and the requested nbits
+        #is, say 2-bit, then the output will be garbage, hence the casting above is
+        #necessary.
         if self.unpack:
             packed = np.empty(int(ar.size*self.bitfact),dtype=self.dtype)
             lib.pack(as_c(ar),
@@ -162,7 +179,7 @@ def editInplace(inst,key,value):
     inst.header[key] = value
     new_header = inst.header.SPPHeader(back_compatible=True)
     if inst.header.hdrlen != len(new_header):
-        raise ValueError,"New header is too long/short for file"
+        raise ValueError("New header is too long/short for file")
     else:
         temp.seek(0)
         temp.write(new_header)

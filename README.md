@@ -1,5 +1,19 @@
-sigpyproc
-=========
+sigpyproc  [![Build Status](https://travis-ci.org/pravirkr/sigpyproc.svg?branch=master)](https://travis-ci.org/pravirkr/sigpyproc)
+=========   
+
+`sigpyproc` is a pulsar and FRB data analysis library for python.
+
+Usage
+-----
+
+```python
+from sigpyproc.Readers import FilReader
+myFil = FilReader("tutorial.fil")
+
+from sigpyproc.Readers import FitsReader
+myFits = FitsReader("tutorial.fits")
+
+```
 
 Installation
 ------------
@@ -14,13 +28,7 @@ Installation
 
 ### Step-by-step guide
 
-Once you have all the requirements installed, you can install this via pip:
-
-```
-pip install git+https://github.com/telegraphic/sigpyproc
-```
-
-Or, download / clone this repository, and then run
+Once you have all the requirements installed, download / clone this repository, and then run
 
 ```
 python setup.py install
@@ -41,8 +49,4 @@ docker run --rm -it sigpyproc
 ```
 
 (Have a read of docker tutorials and documentation for more details!)
-
-
-[![Build Status](https://travis-ci.org/telegraphic/sigpyproc.svg?branch=master)](https://travis-ci.org/telegraphic/sigpyproc)
-
 
