@@ -26,12 +26,12 @@ class File(io.FileIO):
        under the hood, so all calls can be made requesting numbers of units 
        rather than numbers of bits or bytes.
 
-       modified:
+       update:
        cannot subclass file in python 3; using FileIO instead.
     """
 
     def __init__(self,filename,mode,nbits=8):
-        super(File, self).__init__(filename,mode)
+        super().__init__(filename, mode)
         self.nbits = nbits
         self.dtype = nbits_to_dtype[self.nbits]
         if nbits in [1,2,4]:
@@ -52,7 +52,7 @@ class File(io.FileIO):
         """
 
         count = int(nunits*self.bitfact)
-        data = np.fromfile(self, count=count, dtype=self.dtype)
+        data  = np.fromfile(self, count=count, dtype=self.dtype)
         if self.unpack:
             unpacked = np.empty(nunits,dtype=self.dtype)
             lib.unpack(as_c(data),
@@ -79,9 +79,9 @@ class File(io.FileIO):
            attribute.
         """
         if self.dtype != ar.dtype:
-            warnings.warn("Given data (dtype={0}) will be unsafely cast to the \
-                          requested dtype={1} before being written out to file"\
-                          .format(ar.dtype, self.dtype), stacklevel=2)
+            warnings.warn(f"Given data (dtype={ar.dtype}) will be unsafely cast to the"
+                          f"requested dtype={self.dtype} before being written out to file", 
+                          stacklevel=2)
             ar = ar.astype(self.dtype, casting='unsafe')
          
         #The lib.pack function has an assumption that the given array has 8-bit
@@ -147,7 +147,7 @@ def nearestFactor(n,val):
     while check<rootn:
         if n%check==0:
             fact.append(check)
-            fact.append(n/check)
+            fact.append(n//check)
         check+=1
     if rootn==check:
         fact.append(check)

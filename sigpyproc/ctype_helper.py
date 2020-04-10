@@ -1,5 +1,4 @@
 import os
-import glob
 import sysconfig
 import ctypes as C
 
