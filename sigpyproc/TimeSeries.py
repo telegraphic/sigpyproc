@@ -1,9 +1,13 @@
-from numpy.ctypeslib import as_ctypes as as_c
 import numpy as np
 import ctypes as C
+from numpy.ctypeslib import as_ctypes as as_c
+
+from sigpyproc.FoldedData import FoldedData
+from sigpyproc.FourierSeries import FourierSeries
 
 from .ctype_helper import load_lib
 lib = load_lib("libSigPyProcTim.so")
+
 
 class TimeSeries(np.ndarray):
     """Class for handling pulsar data in time series.
@@ -42,7 +46,7 @@ class TimeSeries(np.ndarray):
         :returns: data cube containing the folded data 
         :rtype: :class:`~sigpyproc.FoldedData.FoldedData`  
         """
-        if self.size/(nbins*nints) < 10: 
+        if self.size//(nbins*nints) < 10: 
             raise ValueError("nbins x nints is too large for length of data")
         fold_ar  = np.zeros(nbins*nints,dtype="float64")
         count_ar = np.zeros(nbins*nints,dtype="int32")
@@ -154,7 +158,7 @@ class TimeSeries(np.ndarray):
                 Returned time series is of size nsamples//factor
         """
         if factor == 1: return self
-        newLen = self.size//factor
+        newLen  = self.size//factor
         tim_ar  = np.zeros(newLen,dtype="float32")
         lib.downsampleTim(as_c(self),
                           as_c(tim_ar),
@@ -175,13 +179,13 @@ class TimeSeries(np.ndarray):
         
                 Method also writes a corresponding .inf file from the header data
         """
-        self.header.makeInf(outfile="%s.inf"%(basename))
-        datfile = open("%s.dat"%(basename),"w+")
-        if self.size%2 != 0:
-            self[:-1].tofile(datfile)
-        else:
-            self.tofile(datfile)
-        return "%s.dat"%(basename),"%s.inf"%(basename) 
+        self.header.makeInf(outfile=f"{basename}.inf")
+        with open(f"{basename}.dat", "w+") as datfile:
+            if self.size%2 != 0:
+                self[:-1].tofile(datfile)
+            else:
+                self.tofile(datfile)
+        return f"{basename}.dat", f"{basename}.inf"
 
     def toFile(self,filename):
         """Write time series in sigproc format.
@@ -229,7 +233,6 @@ class TimeSeries(np.ndarray):
         else:
             new_size = self.size
         out_ar = np.zeros(new_size,dtype="float32")
-        print(new_size)
         lib.resample(as_c(self),
                      as_c(out_ar),
                      C.c_int(new_size),
@@ -257,5 +260,3 @@ class TimeSeries(np.ndarray):
         return (self.rFFT()*other.rFFT()).iFFT()
             
 
-from sigpyproc.FoldedData import FoldedData
-from sigpyproc.FourierSeries import FourierSeries

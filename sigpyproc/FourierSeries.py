@@ -1,7 +1,10 @@
+import numpy as np
 import ctypes as C
 from sigpyproc.Utils import File
 from numpy.ctypeslib import as_ctypes as as_c
-import numpy as np
+
+from sigpyproc.TimeSeries import TimeSeries
+from sigpyproc.FoldedData import Profile
 
 from .ctype_helper import load_lib
 lib  = load_lib("libSigPyProcSpec.so")
@@ -88,7 +91,7 @@ class PowerSpectrum(np.ndarray):
         folds = [] 
         for ii in range(nfolds):
             nharm = 2**(ii+1)
-            nfoldi =int(max(1,min(nharm*nfold1-nharm/2,self.size)))
+            nfoldi =int(max(1,min(nharm*nfold1-nharm//2,self.size)))
             harm_ar = np.array([int(kk*ll/float(nharm)) 
                                 for ll in range(nharm) 
                                 for kk in range(1,nharm,2)]).astype("int32")
@@ -256,7 +259,7 @@ class FourierSeries(np.ndarray):
         :rtype: :func:`str`
         """
         if filename is None:
-            filename = "%s.spec"%(self.header.basename)
+            filename = f"{self.header.basename}.spec"
         outfile = self.header.prepOutfile(filename,nbits=32)
         self.tofile(outfile)
         return outfile.name
@@ -271,10 +274,8 @@ class FourierSeries(np.ndarray):
         :rtype: :func:`tuple` of :func:`str`
         """
         if basename is None: basename = self.header.basename
-        self.header.makeInf(outfile="%s.inf"%(basename))
-        fftfile = File("%s.fft"%(basename),"w+")
-        self.tofile(fftfile)
-        return "%s.fft"%(basename),"%s.inf"%(basename)
+        self.header.makeInf(outfile=f"{basename}.inf")
+        with open(f"{basename}.fft", "w+") as fftfile:
+            self.tofile(fftfile)
+        return f"{basename}.fft", f"{basename}.inf"
 
-from sigpyproc.TimeSeries import TimeSeries
-from sigpyproc.FoldedData import Profile
