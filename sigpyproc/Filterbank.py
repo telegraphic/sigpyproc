@@ -3,9 +3,9 @@ import numpy as np
 
 from numpy.ctypeslib import as_ctypes as as_c
 
-from sigpyproc.Utils import rollArray
-from sigpyproc.FoldedData import FoldedData
-from sigpyproc.TimeSeries import TimeSeries
+from .Utils import rollArray
+from .FoldedData import FoldedData
+from .TimeSeries import TimeSeries
 
 from .ctype_helper import load_lib
 lib32 = load_lib("libSigPyProc32.so")

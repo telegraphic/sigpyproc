@@ -3,7 +3,7 @@ import timeit
 import numpy as np
 from tqdm import tqdm
 from natsort import natsorted
-from sigpyproc.Readers import FitsReader, FilReader
+from .Readers import FitsReader, FilReader
 
 
 def get_fileformat(infiles):

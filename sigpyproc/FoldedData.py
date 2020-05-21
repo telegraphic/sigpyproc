@@ -1,6 +1,6 @@
 import numpy as np
 import ctypes as C
-from sigpyproc.Utils import rollArray
+from .Utils import rollArray
 from os import popen
 
 from .ctype_helper import load_lib

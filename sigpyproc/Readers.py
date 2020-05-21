@@ -4,13 +4,13 @@ import numpy as np
 import inspect, struct
 from astropy.io import fits
 
-import sigpyproc.HeaderParams as conf
-from sigpyproc.Utils import File
-from sigpyproc.Header import Header
-from sigpyproc.Filterbank import Filterbank,FilterbankBlock
-from sigpyproc.TimeSeries import TimeSeries
-from sigpyproc.FourierSeries import FourierSeries
-from sigpyproc.PSRFits import SpectraInfo, unpack_2bit, unpack_4bit
+from . import HeaderParams as conf
+from .Utils import File
+from .Header import Header
+from .Filterbank import Filterbank,FilterbankBlock
+from .TimeSeries import TimeSeries
+from .FourierSeries import FourierSeries
+from .PSRFits import SpectraInfo, unpack_2bit, unpack_4bit
 
 import warnings
 warnings.showwarning = lambda message, category = UserWarning, filename = '', \

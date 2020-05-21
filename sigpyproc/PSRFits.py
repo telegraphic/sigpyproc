@@ -25,8 +25,8 @@ from astropy.time import Time
 from astropy.coordinates import Angle
 from astropy.time.formats import erfa
 
-import sigpyproc.HeaderParams as conf 
-from sigpyproc.Header import Header as SigpyprocHeader
+from . import HeaderParams as conf
+from .Header import Header as SigpyprocHeader
 
 import warnings
 warnings.showwarning = lambda message, category = UserWarning, filename = '', \

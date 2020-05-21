@@ -1,8 +1,8 @@
 import numpy as np
-import sigpyproc.HeaderParams as conf
+from . import HeaderParams as conf
 from os.path import splitext
 from struct import pack
-from sigpyproc.Utils import File
+from .Utils import File
 
 class Header(dict):
     """Container object to handle observation metadata.
@@ -141,6 +141,10 @@ class Header(dict):
         :rtype: :func:`str`
         """
         self.updateHeader()
+        baycentric = getattr(self,"barycentric",0)
+        dm         = getattr(self,"refdm",0.0)
+        nchan      = getattr(self,"nchans",1)
+
         inf = (f" Data file name without suffix          =  {self.basename}\n"
                f" Telescope used                         =  Effelsberg\n"
                f" Instrument used                        =  PFFTS\n"
@@ -149,14 +153,14 @@ class Header(dict):
                f" J2000 Declination     (dd:mm:ss.ssss)  =  {radec_to_str(self.src_dej)}\n"
                f" Data observed by                       =  Robotic overlords\n"
                f" Epoch of observation (MJD)             =  {self.tstart:.09f}\n"
-               f" Barycentered?           (1=yes, 0=no)  =  {getattr(self,"barycentric",0):d}\n"
+               f" Barycentered?           (1=yes, 0=no)  =  {barycentric:d}\n"
                f" Number of bins in the time series      =  {self.nsamples:d}\n"
                f" Width of each time series bin (sec)    =  {self.tsamp:.17g}\n"
                f" Any breaks in the data? (1=yes, 0=no)  =  0\n"
                f" Type of observation (EM band)          =  Radio\n"
                f" Beam diameter (arcsec)                 =  9.22\n"
-               f" Dispersion measure (cm-3 pc)           =  {getattr(self,"refdm",0.0):.03f}\n"
-               f" Number of channels                     =  {getattr(self,"nchans",1):d}\n"
+               f" Dispersion measure (cm-3 pc)           =  {dm:.03f}\n"
+               f" Number of channels                     =  {nchan:d}\n"
                f" Data analyzed by                       =  sigpyproc\n")
         
         if hasattr(self,"foff") and hasattr(self,"nchans") and hasattr(self,"fch1"):
